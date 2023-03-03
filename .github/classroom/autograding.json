@@ -1,0 +1,14 @@
+{
+  "tests": [
+    {
+      "name": "Run unit tests",
+      "setup": "sudo -H pip3 install numpy pandas matplotlib pytest",
+      "run": "pytest",
+      "input": "",
+      "output": "",
+      "comparison": "included",
+      "timeout": 5,
+      "points": null
+    }
+  ]
+}
