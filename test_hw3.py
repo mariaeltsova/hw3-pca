@@ -244,7 +244,9 @@ class PCATest(unittest.TestCase):
 
         cosine = np.sort(
             [
-                np.dot(i, j) / (np.linalg.norm(i, ord=2) * np.linalg.norm(j, ord=2))
+                np.abs(
+                    np.dot(i, j) / (np.linalg.norm(i, ord=2) * np.linalg.norm(j, ord=2))
+                )
                 for i in pca_eigenvectors
                 for j in eigenvectors
             ]
