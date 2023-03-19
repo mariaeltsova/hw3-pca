@@ -3,7 +3,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import re
-
+from math import log
+import random
 # do not import any non-python native libraries because github tests might fail
 # consult with TAs if you find them crucial for solving the exercise
 
@@ -22,7 +23,12 @@ def read_text_file(filename: str) -> str:
     str
         A string of characters from the file
     """
-    raise NotImplementedError()
+    file = open(filename, "r", encoding='utf-8')
+    #read whole file to a string
+    string = file.read()
+    #close file
+    file.close()
+    return string
 
 
 def preprocess_text(text: str) -> list["str"]:
@@ -44,7 +50,10 @@ def preprocess_text(text: str) -> list["str"]:
     list['str']
         A list of words as strings in the same order as in the original document.
     """
-    raise NotImplementedError()
+    #print(text, "\n", "\n")
+    text = "".join([ c if c.isalnum() else " " for c in text ])
+    text = text.lower()
+    return text.split()
 
 
 def words_into_kmers(words: list["str"], k: int) -> dict:
@@ -64,7 +73,18 @@ def words_into_kmers(words: list["str"], k: int) -> dict:
     dict
         Dictionary with keys k-mers (string) and values number of occurances (int)
     """
-    raise NotImplementedError()
+    dict = {}
+    
+    for word in words:
+        while k <= len(word):
+            s = word[0:k]
+            #check if dictionary contains
+            if s in dict.keys():
+                dict[s] += 1
+            else:
+                dict[s] = 1 
+            word = word[1:]
+    return dict
 
 
 def words_into_bag_of_words(words) -> dict:
@@ -81,7 +101,13 @@ def words_into_bag_of_words(words) -> dict:
     dict
         Dictionary with keys words (string) and values number of occurances (int)
     """
-    raise NotImplementedError()
+    dict = {}
+    for word in words:
+        if word in dict.keys():
+            dict[word] += 1
+        else:
+            dict[word] = 1
+    return dict
 
 
 def words_into_phrases(words: list["str"], phrase_encoding: list["int"]) -> dict["str"]:
@@ -115,7 +141,26 @@ def words_into_phrases(words: list["str"], phrase_encoding: list["int"]) -> dict
     dict
         Dictionary with keys phrase (string) and values number of occurances (int)
     """
-    raise NotImplementedError()
+    dict = {}
+   # print(words)
+        #sprehodimo se od 0 word-a do len(words) - len(phrase_encoding)
+    for startIndex in range(0, len(words) - len(phrase_encoding) + 1):
+        phrase = ""
+        for curIndex in range(startIndex, startIndex + len(phrase_encoding) ):
+            if(curIndex - startIndex != 0):
+                phrase += "-"
+            if(phrase_encoding[curIndex - startIndex] == 0):
+                phrase += "/"
+            else:
+                phrase += words[curIndex]
+        #print("startindex=", startIndex,  "phrase=", phrase)
+        if phrase in dict.keys():
+            dict[phrase] += 1
+        else:
+            dict[phrase] = 1
+
+    #print(dict.keys())
+    return dict
 
 
 def term_frequency(encoding: dict) -> dict:
@@ -132,7 +177,11 @@ def term_frequency(encoding: dict) -> dict:
     dict
         Dictonary with keys strings (kmers, words, phrases) and values (FREQUENCY of occurances in this document).
     """
-    raise NotImplementedError()
+    numOcc = sum(encoding.values())
+   # print("sum = ", numOcc)
+    for key in encoding.keys():
+        encoding[key] = encoding[key] / numOcc
+    return encoding
 
 
 def inverse_document_frequency(documents: list["dict"]):
@@ -153,7 +202,26 @@ def inverse_document_frequency(documents: list["dict"]):
     dict
         Dictonary with keys strings (kmers, words, phrases) and values (FREQUENCY of occurances in this document.
     """
-    raise NotImplementedError()
+   # print(documents)
+   # print(len(documents))
+   # print(documents[0].keys())
+    D = len(documents)
+    allTerms = list(documents[0].keys())
+    for doc in documents:
+        allTerms.extend(list(doc))
+        allTerms = list(set(allTerms))
+    
+    #create a dictionary from list
+    inv_freq_dict = dict.fromkeys(allTerms, 0)
+    #count actual frequency
+    for term in allTerms:
+        count = 0
+        for doc in documents:
+            if term in doc.keys():
+                count += 1
+        idf= log(D / (1 + count))
+        inv_freq_dict[term] = idf
+    return inv_freq_dict
 
 
 def tf_idf(encoding: dict, term_importance_idf: dict) -> dict:
@@ -178,7 +246,14 @@ def tf_idf(encoding: dict, term_importance_idf: dict) -> dict:
         Dictonary with keys strings (kmers, words, phrases) and values (tf-idf value).
         Includes only keys from the IDF dictionary.
     """
-    raise NotImplementedError()
+    
+    res = dict.fromkeys(term_importance_idf.keys(), 0)
+    for term in res.keys():
+        if term not in encoding.keys():
+            res[term] = 0
+        else:
+            res[term] = term_importance_idf[term] * encoding[term]
+    return res
 
 
 def cosine_similarity(vektor_a: np.array, vektor_b: np.array) -> float:
@@ -195,7 +270,8 @@ def cosine_similarity(vektor_a: np.array, vektor_b: np.array) -> float:
     float
         Cosine similarity
     """
-    raise NotImplementedError()
+    dist = ((vektor_a @ vektor_b) / (np.linalg.norm(vektor_a)*np.linalg.norm(vektor_b)))
+    return dist
 
 
 def jaccard_similarity(vektor_a, vektor_b) -> float:
@@ -213,7 +289,6 @@ def jaccard_similarity(vektor_a, vektor_b) -> float:
         Jaccard similarity
     """
     raise NotImplementedError()
-
 
 class PCA:
     def __init__(
@@ -237,90 +312,85 @@ class PCA:
         self.max_iterations = max_iterations
         self.tolerance = tolerance
         self.rnd_seed = rnd_seed
+        self.mean = 0
 
     def fit(self, X: np.ndarray) -> None:
-        """
-        Fit principle component vectors.
-        Center the data around zero.
+        lenOfS = X.shape[1]
+        #get mean
+        #print("mean =", np.average(X, axis=0))
+        self.mean =np.average(X, axis=0)
+        for i in range(lenOfS):
+            S = np.cov(X.T)
+            x = S[random.randint(0, lenOfS - 1)]
+            u, lambda1 = self.potencna_metoda(S, x)
+            p = np.dot(X, u)
+            X = X - np.outer(np.dot(X, u), u)
+            self.eigenvalues.append(lambda1); self.eigenvectors.append(u)
 
-        Arguments
-        ---------
-        X: np.ndarray
-            Data matrix with shape (n_samples, n_features)
-        """
-        raise NotImplementedError()
+
+    def fit_dual_pca(self, X: np.ndarray) -> None:
+        lenOfS = X.shape[0]
+        self.mean =np.average(X, axis=0)
+        N = X.shape[0]
+        X_orig = np.copy(X)
+        for i in range(lenOfS):
+            S = np.cov(X)
+            x = S[random.randint(0, lenOfS - 1)]
+            u, lambda1 = self.potencna_metoda(S, x)
+            p = np.dot(X.T, u)
+            X = X - np.outer(u, np.dot(X.T, u))
+            self.eigenvalues.append(lambda1); self.eigenvectors.append(u)
+        Xd = (X_orig - self.mean).T
+        #print("Xd.shape", Xd.shape)
+        #print("self.eigenvectros.shape", np.array(self.eigenvectors).shape)
+        S = np.array(self.eigenvalues) + 10e-15
+        #print("Xd", Xd)
+        Xd = np.nan_to_num(Xd)
+        #print("np.diag(np.sqrt(1 / (S * (N - 1))) )", np.diag(np.sqrt(1 / (S * (N - 1))) ))
+        d = np.nan_to_num(np.diag(np.sqrt(1 / (S * (N - 1))) ))
+        #print("d", d)
+       # print("self.eigenvectors", self.eigenvectors)
+        self.eigenvectors = np.nan_to_num(np.array(self.eigenvectors))
+        U =  Xd @ self.eigenvectors @ d
+       # print("U = ", U)
+        #U =  np.nan_to_num(U)
+        
+        self.eigenvectors = U
+
 
     def potencna_metoda(
         self, M: np.ndarray, vector: np.array, iteration: int = 0
     ) -> tuple:
-        """
-        Perform the power method for calculating the eigenvector with the highest corresponding
-        eigenvalue of the covariance matrix.
-        This should be a recursive function. Use 'max_iterations' and 'tolerance' to terminate
-        recursive call when necessary.
-
-        Arguments
-        ---------
-        M: np.ndarray
-            Covariance matrix of the zero centered data.
-        vector: np.array
-            Candidate eigenvector in the iteration.
-        iteration: int
-            Index of the consecutive iteration for termination purpose of the
-
-        Return
-        ------
-        np.array
-            The unit eigenvector of the covariance matrix.
-        float
-            The corresponding eigenvalue fo the covariance matrix.
-        """
-        raise NotImplementedError()
+        
+        if iteration == self.max_iterations - 1:
+            eigenvalue = vector.T @ M @ vector
+            #print(vector, eigenvalue)
+            return (vector, eigenvalue)
+        vector = vector @ M
+        
+        #print(M)
+        #vector = np.dot(vector, M)
+        vector = vector / np.linalg.norm(vector)
+        iteration += 1
+        return self.potencna_metoda( M, vector, iteration)
 
     def transform(self, X: np.ndarray) -> np.ndarray:
-        """
-        Transform the data (X) using fitted eigenvectors
-
-        Arguments
-        ---------
-        X: np.ndarray
-            New data with the same number of features as the fitting data.
-
-        Return
-        ------
-        np.ndarray
-            Transformed data with the shape (n_samples, n_components).
-        """
-        raise NotImplementedError()
+        print("len(self.mean)", len(self.mean))
+        print("X.shape", X.shape)
+        return np.dot(X - self.mean, np.array(self.eigenvectors[0:self.n_components]).T)
+    
+    def transform_dual_pca(self, X: np.ndarray) -> np.ndarray:
+   
+        return np.dot((X - self.mean).T, np.array(self.eigenvectors)[:,:self.n_components])
+       
 
     def get_explained_variance(self):
-        """
-        Return the explained variance ratio of the principle components.
-        Prior to calling fit() function return None.
-        Return only the ratio for the top 'n_components'.
+        return self.eigenvalues
+        
 
-        Return
-        ------
-        np.array
-            Explained variance for the top 'n_components'.
-        """
-        raise NotImplementedError()
-
-    def inverse_transform(self, X: np.ndarray) -> np.ndarray:
-        """
-        Transform the data from the principle component space into
-        the real space.
-
-        Arguments
-        ---------
-        X: np.ndarray
-            Data  in PC space with the same number of features as
-            the fitting data.
-
-        Return
-        ------
-        np.ndarray
-            Transformed data in original space with
-            the shape (n_samples, n_components).
-        """
-        raise NotImplementedError()
+    def inverse_transform(self, X: np.ndarray) -> np.ndarray:     
+        #data_original = np.dot(X, self.eigenvectors) + pca.mean_
+        return np.dot(X, self.eigenvectors) + self.mean
+    
+    def get_n_eigenvector(self, n):
+        return np.array(self.eigenvectors[n])
